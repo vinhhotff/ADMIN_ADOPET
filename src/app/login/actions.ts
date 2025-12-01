@@ -62,4 +62,7 @@ export async function logoutAction() {
   const cookieStore = await cookies();
   cookieStore.delete(SESSION_COOKIE);
   cookieStore.delete(NAME_COOKIE);
+  
+  // Note: Không cần signOut Supabase vì admin auth dùng cookie-based
+  // Nếu cần tích hợp Supabase auth sau này, thêm logic ở đây
 }

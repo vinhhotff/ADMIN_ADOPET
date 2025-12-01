@@ -2,6 +2,7 @@ import { Eye, Images, Pencil, Plus, Trash2 } from 'lucide-react';
 
 import { fetchPosts } from '@/lib/data/posts';
 import { RowActionDialog } from '@/components/ui/RowActionDialog';
+import { TableFilters } from '@/components/ui/TableFilters';
 import { getParamValue, includesInsensitive, SearchParams, toISOStringOrNull } from '@/lib/utils/filters';
 import { createPostAction, updatePostAction, deletePostAction } from './actions';
 
@@ -14,13 +15,14 @@ const getUserLabel = (post: Awaited<ReturnType<typeof fetchPosts>>[number]) =>
   post.user_name || post.user_email || post.user_id.slice(0, 10);
 
 interface PostsPageProps {
-  searchParams?: SearchParams;
+  searchParams?: Promise<SearchParams>;
 }
 
 export default async function PostsPage({ searchParams }: PostsPageProps) {
-  const emailParam = getParamValue(searchParams?.email)?.trim() || '';
-  const fromParam = getParamValue(searchParams?.from) || '';
-  const toParam = getParamValue(searchParams?.to) || '';
+  const params = await searchParams;
+  const emailParam = getParamValue(params?.email)?.trim() || '';
+  const fromParam = getParamValue(params?.from) || '';
+  const toParam = getParamValue(params?.to) || '';
 
   const createdFrom = toISOStringOrNull(fromParam) || undefined;
   const createdTo = toISOStringOrNull(toParam) || undefined;
@@ -57,30 +59,7 @@ export default async function PostsPage({ searchParams }: PostsPageProps) {
         </RowActionDialog>
       </div>
 
-      <form className="filter-form" method="get">
-        <label>
-          Email người đăng
-          <input type="email" name="email" placeholder="user@example.com" defaultValue={emailParam} />
-        </label>
-        <label>
-          Từ ngày
-          <input type="datetime-local" name="from" defaultValue={fromParam} />
-        </label>
-        <label>
-          Đến ngày
-          <input type="datetime-local" name="to" defaultValue={toParam} />
-        </label>
-        <div className="filter-form__actions">
-          <button className="button button--primary" type="submit">
-            Lọc
-          </button>
-          {(emailParam || fromParam || toParam) && (
-            <a className="button button--ghost" href="/posts">
-              Xóa lọc
-            </a>
-          )}
-        </div>
-      </form>
+      <TableFilters emailPlaceholder="Lọc theo email người đăng..." />
 
       <table className="table">
         <thead>

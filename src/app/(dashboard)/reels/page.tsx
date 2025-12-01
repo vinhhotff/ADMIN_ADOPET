@@ -2,6 +2,7 @@ import { Camera, Eye, Pencil, Plus, ShieldCheck, Trash2 } from 'lucide-react';
 
 import { fetchReels } from '@/lib/data/reels';
 import { RowActionDialog } from '@/components/ui/RowActionDialog';
+import { TableFilters } from '@/components/ui/TableFilters';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { getParamValue, includesInsensitive, SearchParams, toISOStringOrNull } from '@/lib/utils/filters';
 import { createReelAction, updateReelAction, deleteReelAction, moderateReelAction } from './actions';
@@ -17,13 +18,14 @@ const getUserLabel = (reel: Awaited<ReturnType<typeof fetchReels>>[number]) =>
   reel.user_name || reel.user_email || reel.user_id.slice(0, 10);
 
 interface ReelsPageProps {
-  searchParams?: SearchParams;
+  searchParams?: Promise<SearchParams>;
 }
 
 export default async function ReelsPage({ searchParams }: ReelsPageProps) {
-  const emailParam = getParamValue(searchParams?.email)?.trim() || '';
-  const fromParam = getParamValue(searchParams?.from) || '';
-  const toParam = getParamValue(searchParams?.to) || '';
+  const params = await searchParams;
+  const emailParam = getParamValue(params?.email)?.trim() || '';
+  const fromParam = getParamValue(params?.from) || '';
+  const toParam = getParamValue(params?.to) || '';
 
   const createdFrom = toISOStringOrNull(fromParam) || undefined;
   const createdTo = toISOStringOrNull(toParam) || undefined;
@@ -92,30 +94,7 @@ export default async function ReelsPage({ searchParams }: ReelsPageProps) {
         </RowActionDialog>
       </div>
 
-      <form className="filter-form" method="get">
-        <label>
-          Email người tạo
-          <input type="email" name="email" placeholder="user@example.com" defaultValue={emailParam} />
-        </label>
-        <label>
-          Từ ngày
-          <input type="datetime-local" name="from" defaultValue={fromParam} />
-        </label>
-        <label>
-          Đến ngày
-          <input type="datetime-local" name="to" defaultValue={toParam} />
-        </label>
-        <div className="filter-form__actions">
-          <button className="button button--primary" type="submit">
-            Lọc
-          </button>
-          {(emailParam || fromParam || toParam) && (
-            <a className="button button--ghost" href="/reels">
-              Xóa lọc
-            </a>
-          )}
-        </div>
-      </form>
+      <TableFilters emailPlaceholder="Lọc theo email người tạo..." />
 
       <table className="table">
         <thead>

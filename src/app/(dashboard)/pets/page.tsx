@@ -2,6 +2,7 @@ import { Eye, Pencil, Plus, Trash2 } from 'lucide-react';
 
 import { fetchPets } from '@/lib/data/pets';
 import { RowActionDialog } from '@/components/ui/RowActionDialog';
+import { TableFilters } from '@/components/ui/TableFilters';
 import { getParamValue, includesInsensitive, SearchParams, toISOStringOrNull } from '@/lib/utils/filters';
 import { createPetAction, updatePetAction, deletePetAction } from './actions';
 
@@ -49,8 +50,7 @@ export default async function PetsPage({ searchParams }: PetsPageProps) {
           <p className="panel__subtitle">Dữ liệu đọc trực tiếp từ bảng public.pets trong Supabase</p>
         </div>
 
-        <RowActionDialog icon={<Plus size={16} />} label="Thêm thú cưng mới">
-          <form action={createPetAction} className="form">
+        <RowActionDialog icon={<Plus size={16} />} label="Thêm thú cưng mới" action={createPetAction} successMessage="Đã tạo thú cưng thành công!">
             <label>
               Tên *
               <input name="name" placeholder="Bim" required />
@@ -106,37 +106,10 @@ export default async function PetsPage({ searchParams }: PetsPageProps) {
                 <option value="false">Đã khóa</option>
               </select>
             </label>
-            <button className="button button--primary" type="submit">
-              Tạo hồ sơ
-            </button>
-          </form>
         </RowActionDialog>
       </div>
 
-      <form className="filter-form" method="get">
-        <label>
-          Email người bán
-          <input type="email" name="email" placeholder="seller@example.com" defaultValue={emailParam} />
-        </label>
-        <label>
-          Từ ngày
-          <input type="datetime-local" name="from" defaultValue={fromParam} />
-        </label>
-        <label>
-          Đến ngày
-          <input type="datetime-local" name="to" defaultValue={toParam} />
-        </label>
-        <div className="filter-form__actions">
-          <button className="button button--primary" type="submit">
-            Lọc
-          </button>
-          {(emailParam || fromParam || toParam) && (
-            <a className="button button--ghost" href="/pets">
-              Xóa lọc
-            </a>
-          )}
-        </div>
-      </form>
+      <TableFilters emailPlaceholder="Lọc theo email người bán..." />
 
       <table className="table">
         <thead>
@@ -191,7 +164,6 @@ export default async function PetsPage({ searchParams }: PetsPageProps) {
                         <span>{pet.seller_email}</span>
                       </div>
                     )}
-                    </div>
                     <div className="data-list__item">
                       <span className="data-list__label">Tuổi</span>
                       <span>{pet.age_months ? `${pet.age_months} tháng` : 'Không rõ'}</span>
@@ -213,8 +185,7 @@ export default async function PetsPage({ searchParams }: PetsPageProps) {
                   </dl>
                 </RowActionDialog>
 
-                <RowActionDialog icon={<Pencil size={16} />} label={`Cập nhật ${pet.name}`}>
-                  <form action={updatePetAction} className="form">
+                <RowActionDialog icon={<Pencil size={16} />} label={`Cập nhật ${pet.name}`} action={updatePetAction} successMessage="Đã cập nhật thành công!">
                     <input type="hidden" name="id" value={pet.id} />
                     <label>
                       Tên
@@ -271,22 +242,16 @@ export default async function PetsPage({ searchParams }: PetsPageProps) {
                         <option value="false">Đã khóa</option>
                       </select>
                     </label>
-                    <button className="button button--primary" type="submit">
-                      Lưu thay đổi
-                    </button>
-                  </form>
                 </RowActionDialog>
 
-                <RowActionDialog icon={<Trash2 size={16} />} variant="danger" label={`Xóa ${pet.name}`}>
-                  <form action={deletePetAction} className="form">
+                <RowActionDialog icon={<Trash2 size={16} />} variant="danger" label={`Xóa ${pet.name}`} action={deletePetAction} successMessage="Đã xóa thành công!">
                     <input type="hidden" name="id" value={pet.id} />
-                    <p>Bạn chắc chắn muốn xóa hồ sơ này? Thao tác không thể hoàn tác.</p>
-                    <button className="button button--danger" type="submit">
-                      Xác nhận xóa
-                    </button>
-                  </form>
+                    <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '14px' }}>
+                      Bạn chắc chắn muốn xóa hồ sơ này? Thao tác không thể hoàn tác.
+                    </p>
                 </RowActionDialog>
               </td>
+              
             </tr>
           ))}
         </tbody>

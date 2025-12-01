@@ -1,6 +1,6 @@
 import { CircleUserRound } from 'lucide-react';
 import { cookies } from 'next/headers';
-import { logoutAction } from '@/app/login/actions';
+import { LogoutButton } from '@/components/auth/LogoutButton';
 
 export async function TopBar() {
   const cookieStore = await cookies();
@@ -18,11 +18,7 @@ export async function TopBar() {
           <p className="topbar__name">{adminName}</p>
           <p className="topbar__role">Super admin</p>
         </div>
-        <form action={logoutAction}>
-          <button type="submit" className="button button--ghost" style={{ marginLeft: 12 }}>
-            Đăng xuất
-          </button>
-        </form>
+        <LogoutButton />
       </div>
     </header>
   );

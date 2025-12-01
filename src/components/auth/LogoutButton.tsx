@@ -2,17 +2,17 @@
 
 import { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { getSupabaseBrowserClient } from '@/lib/supabase/browser';
+import { logoutAction } from '@/app/login/actions';
 
 export function LogoutButton() {
   const [pending, startTransition] = useTransition();
   const router = useRouter();
-  const supabase = getSupabaseBrowserClient();
 
   const handleSignOut = () => {
     startTransition(async () => {
-      await supabase.auth.signOut();
+      await logoutAction();
       router.replace('/login');
+      router.refresh(); // Force refresh để clear cache
     });
   };
 
