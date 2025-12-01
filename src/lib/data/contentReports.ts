@@ -17,6 +17,15 @@ export interface ContentReport {
   admin_notes: string | null;
   created_at: string;
   updated_at: string;
+  // Additional fields for pet reports
+  pet_seller_id?: string;
+  pet_details?: {
+    name: string;
+    seller_id: string;
+    type: string;
+    price: number | null;
+    is_available: boolean;
+  };
 }
 
 export async function fetchContentReports(status?: string): Promise<ContentReport[]> {
@@ -86,10 +95,15 @@ export async function fetchContentReports(status?: string): Promise<ContentRepor
           case 'pet':
             const { data: pet } = await supabase
               .from('pets')
-              .select('name')
+              .select('name, seller_id, type, price, is_available')
               .eq('id', report.target_id)
               .single();
-            targetContent = pet?.name || '';
+            if (pet) {
+              targetContent = pet.name || '';
+              // Store seller_id for warning functionality
+              (report as any).pet_seller_id = pet.seller_id;
+              (report as any).pet_details = pet;
+            }
             break;
         }
       } catch (err) {

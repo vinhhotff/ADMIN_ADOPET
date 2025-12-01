@@ -17,6 +17,15 @@ export interface PetProfile {
   created_at: string;
 }
 
+export interface PetDetails extends PetProfile {
+  images: string[] | null;
+  health_status: string | null;
+  vaccination_status: string | null;
+  verification_status: string | null;
+  latitude: number | null;
+  longitude: number | null;
+}
+
 interface PetFilters {
   createdFrom?: string | null;
   createdTo?: string | null;
@@ -72,3 +81,32 @@ export async function fetchPets(limit = 100, filters?: PetFilters): Promise<PetP
   });
 }
 
+export async function fetchPetDetails(petId: string): Promise<PetDetails | null> {
+  const supabase = getServiceSupabaseClient();
+
+  const { data, error } = await supabase
+    .from('pets')
+    .select('*')
+    .eq('id', petId)
+    .single();
+
+  if (error) {
+    console.error('Error fetching pet details:', error);
+    return null;
+  }
+
+  if (!data) return null;
+
+  // Get seller info
+  const { data: sellerProfile } = await supabase
+    .from('profiles')
+    .select('full_name, email')
+    .eq('id', data.seller_id)
+    .single();
+
+  return {
+    ...data,
+    seller_name: sellerProfile?.full_name || null,
+    seller_email: sellerProfile?.email || null,
+  } as PetDetails;
+}

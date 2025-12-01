@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { CheckCircle, XCircle, Clock, Trash2, Eye } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, Trash2, Eye, AlertTriangle, Info } from 'lucide-react';
 import { ContentReport, updateReportStatus, deleteReportedContent } from '@/lib/data/contentReports';
-import { updateReportStatusAction, deleteContentAction } from './actions';
+import { updateReportStatusAction, deleteContentAction, deletePetAction, warnSellerAction } from './actions';
+import { fetchPetDetails, PetDetails } from '@/lib/data/pets';
 
 interface ContentReportsClientProps {
   initialReports: ContentReport[];
@@ -16,11 +17,20 @@ export function ContentReportsClient({
   initialStatus,
 }: ContentReportsClientProps) {
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const [status, setStatus] = useState(initialStatus);
   const [reports, setReports] = useState(initialReports);
   const [processing, setProcessing] = useState<string | null>(null);
   const [adminNotes, setAdminNotes] = useState('');
   const [showActionModal, setShowActionModal] = useState<{ reportId: string; action: string } | null>(null);
+  const [showPetDetailsModal, setShowPetDetailsModal] = useState<{ petId: string; petDetails: PetDetails | null } | null>(null);
+  const [showWarnModal, setShowWarnModal] = useState<{ reportId: string; sellerId: string; report: ContentReport } | null>(null);
+  const [warningForm, setWarningForm] = useState({
+    warning_type: 'content_violation' as const,
+    reason: '',
+    description: '',
+    severity: 'medium' as const,
+  });
 
   const handleUpdateStatus = async (reportId: string, newStatus: 'reviewed' | 'resolved' | 'dismissed', notes?: string) => {
     setProcessing(reportId);
@@ -28,7 +38,9 @@ export function ContentReportsClient({
       await updateReportStatusAction(reportId, newStatus, notes);
       setShowActionModal(null);
       setAdminNotes('');
-      router.refresh();
+      startTransition(() => {
+        router.refresh();
+      });
     } catch (error) {
       console.error('Update status error:', error);
       alert('Lỗi khi cập nhật trạng thái report');
@@ -43,11 +55,79 @@ export function ContentReportsClient({
     }
     setProcessing(reportId);
     try {
-      await deleteContentAction(targetType as any, targetId);
-      router.refresh();
+      if (targetType === 'pet') {
+        await deletePetAction(targetId);
+      } else {
+        await deleteContentAction(targetType as any, targetId);
+      }
+      startTransition(() => {
+        router.refresh();
+      });
     } catch (error) {
       console.error('Delete content error:', error);
       alert('Lỗi khi xóa nội dung');
+    } finally {
+      setProcessing(null);
+    }
+  };
+
+  const handleViewPetDetails = async (petId: string) => {
+    try {
+      const petDetails = await fetchPetDetails(petId);
+      setShowPetDetailsModal({ petId, petDetails });
+    } catch (error) {
+      console.error('Error fetching pet details:', error);
+      alert('Lỗi khi tải chi tiết pet');
+    }
+  };
+
+  const handleWarnSeller = async (report: ContentReport) => {
+    if (!report.pet_seller_id) {
+      alert('Không tìm thấy seller ID');
+      return;
+    }
+    setShowWarnModal({
+      reportId: report.id,
+      sellerId: report.pet_seller_id,
+      report,
+    });
+  };
+
+  const handleSubmitWarning = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!showWarnModal) return;
+
+    if (!warningForm.reason.trim()) {
+      alert('Vui lòng nhập lý do cảnh cáo');
+      return;
+    }
+
+    setProcessing(showWarnModal.reportId);
+    try {
+      const formData = new FormData();
+      formData.append('seller_id', showWarnModal.sellerId);
+      formData.append('warning_type', warningForm.warning_type);
+      formData.append('reason', warningForm.reason);
+      formData.append('description', warningForm.description);
+      formData.append('severity', warningForm.severity);
+      formData.append('related_report_id', showWarnModal.reportId);
+      formData.append('related_content_type', showWarnModal.report.target_type);
+      formData.append('related_content_id', showWarnModal.report.target_id);
+
+      await warnSellerAction(formData);
+      setShowWarnModal(null);
+      setWarningForm({
+        warning_type: 'content_violation',
+        reason: '',
+        description: '',
+        severity: 'medium',
+      });
+      startTransition(() => {
+        router.refresh();
+      });
+    } catch (error) {
+      console.error('Warning seller error:', error);
+      alert('Lỗi khi cảnh cáo seller');
     } finally {
       setProcessing(null);
     }
@@ -182,6 +262,49 @@ export function ContentReportsClient({
 
                 {report.status === 'pending' && (
                   <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                    {report.target_type === 'pet' && (
+                      <>
+                        <button
+                          onClick={() => handleViewPetDetails(report.target_id)}
+                          className="button button--ghost"
+                          style={{ fontSize: 14 }}
+                        >
+                          <Info size={14} style={{ marginRight: 4 }} />
+                          Xem chi tiết pet
+                        </button>
+                        {report.pet_seller_id && (
+                          <button
+                            onClick={() => handleWarnSeller(report)}
+                            disabled={processing === report.id}
+                            className="button button--ghost"
+                            style={{ fontSize: 14, color: 'var(--warning)' }}
+                          >
+                            <AlertTriangle size={14} style={{ marginRight: 4 }} />
+                            Cảnh cáo seller
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDeleteContent(report.id, report.target_type, report.target_id)}
+                          disabled={processing === report.id}
+                          className="button button--ghost"
+                          style={{ fontSize: 14, color: 'var(--error)' }}
+                        >
+                          <Trash2 size={14} style={{ marginRight: 4 }} />
+                          Xóa pet
+                        </button>
+                      </>
+                    )}
+                    {report.target_type !== 'pet' && (
+                      <button
+                        onClick={() => handleDeleteContent(report.id, report.target_type, report.target_id)}
+                        disabled={processing === report.id}
+                        className="button button--ghost"
+                        style={{ fontSize: 14, color: 'var(--error)' }}
+                      >
+                        <Trash2 size={14} style={{ marginRight: 4 }} />
+                        Xóa nội dung
+                      </button>
+                    )}
                     <button
                       onClick={() => setShowActionModal({ reportId: report.id, action: 'reviewed' })}
                       disabled={processing === report.id}
@@ -208,15 +331,6 @@ export function ContentReportsClient({
                     >
                       <XCircle size={14} style={{ marginRight: 4 }} />
                       Bỏ qua
-                    </button>
-                    <button
-                      onClick={() => handleDeleteContent(report.id, report.target_type, report.target_id)}
-                      disabled={processing === report.id}
-                      className="button button--ghost"
-                      style={{ fontSize: 14, color: 'var(--error)' }}
-                    >
-                      <Trash2 size={14} style={{ marginRight: 4 }} />
-                      Xóa nội dung
                     </button>
                   </div>
                 )}
@@ -297,6 +411,222 @@ export function ContentReportsClient({
                 Xác nhận
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pet Details Modal */}
+      {showPetDetailsModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+          onClick={() => setShowPetDetailsModal(null)}
+        >
+          <div
+            className="panel"
+            style={{ maxWidth: 600, width: '90%', maxHeight: '90vh', overflow: 'auto' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <h3>Chi tiết Pet</h3>
+              <button
+                className="button button--ghost"
+                onClick={() => setShowPetDetailsModal(null)}
+              >
+                Đóng
+              </button>
+            </div>
+            {showPetDetailsModal.petDetails ? (
+              <dl className="data-list">
+                <div className="data-list__item">
+                  <span className="data-list__label">Tên</span>
+                  <span>{showPetDetailsModal.petDetails.name}</span>
+                </div>
+                <div className="data-list__item">
+                  <span className="data-list__label">Loài</span>
+                  <span>{showPetDetailsModal.petDetails.type}</span>
+                </div>
+                <div className="data-list__item">
+                  <span className="data-list__label">Giống</span>
+                  <span>{showPetDetailsModal.petDetails.breed || 'Không có'}</span>
+                </div>
+                <div className="data-list__item">
+                  <span className="data-list__label">Giới tính</span>
+                  <span>{showPetDetailsModal.petDetails.gender || 'Không rõ'}</span>
+                </div>
+                <div className="data-list__item">
+                  <span className="data-list__label">Tuổi</span>
+                  <span>{showPetDetailsModal.petDetails.age_months ? `${showPetDetailsModal.petDetails.age_months} tháng` : 'Không rõ'}</span>
+                </div>
+                <div className="data-list__item">
+                  <span className="data-list__label">Giá</span>
+                  <span>{showPetDetailsModal.petDetails.price ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(showPetDetailsModal.petDetails.price) : 'Chưa đặt'}</span>
+                </div>
+                <div className="data-list__item">
+                  <span className="data-list__label">Địa điểm</span>
+                  <span>{showPetDetailsModal.petDetails.location || 'Không có'}</span>
+                </div>
+                <div className="data-list__item">
+                  <span className="data-list__label">Trạng thái</span>
+                  <span>{showPetDetailsModal.petDetails.is_available ? 'Đang mở' : 'Đã khóa'}</span>
+                </div>
+                <div className="data-list__item">
+                  <span className="data-list__label">Seller</span>
+                  <span>{showPetDetailsModal.petDetails.seller_name || showPetDetailsModal.petDetails.seller_email || showPetDetailsModal.petDetails.seller_id}</span>
+                </div>
+                {showPetDetailsModal.petDetails.description && (
+                  <div className="data-list__item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                    <span className="data-list__label">Mô tả</span>
+                    <span>{showPetDetailsModal.petDetails.description}</span>
+                  </div>
+                )}
+                {showPetDetailsModal.petDetails.images && showPetDetailsModal.petDetails.images.length > 0 && (
+                  <div className="data-list__item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                    <span className="data-list__label">Ảnh ({showPetDetailsModal.petDetails.images.length})</span>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+                      {showPetDetailsModal.petDetails.images.map((img, idx) => (
+                        <a key={idx} href={img} target="_blank" rel="noreferrer" style={{ display: 'block' }}>
+                          <img src={img} alt={`Pet image ${idx + 1}`} style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: 4 }} />
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </dl>
+            ) : (
+              <p>Đang tải...</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Warn Seller Modal */}
+      {showWarnModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+          onClick={() => {
+            setShowWarnModal(null);
+            setWarningForm({
+              warning_type: 'content_violation',
+              reason: '',
+              description: '',
+              severity: 'medium',
+            });
+          }}
+        >
+          <div
+            className="panel"
+            style={{ maxWidth: 500, width: '90%', maxHeight: '90vh', overflow: 'auto' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ marginBottom: 16 }}>Cảnh cáo Seller</h3>
+            <form onSubmit={handleSubmitWarning} className="form">
+              <input type="hidden" name="seller_id" value={showWarnModal.sellerId} />
+              <input type="hidden" name="related_report_id" value={showWarnModal.reportId} />
+              <input type="hidden" name="related_content_type" value={showWarnModal.report.target_type} />
+              <input type="hidden" name="related_content_id" value={showWarnModal.report.target_id} />
+
+              <label>
+                Loại cảnh cáo *
+                <select
+                  name="warning_type"
+                  value={warningForm.warning_type}
+                  onChange={(e) => setWarningForm({ ...warningForm, warning_type: e.target.value as any })}
+                  required
+                >
+                  <option value="content_violation">Vi phạm nội dung</option>
+                  <option value="spam">Spam</option>
+                  <option value="inappropriate_content">Nội dung không phù hợp</option>
+                  <option value="fake_listing">Danh sách giả mạo</option>
+                  <option value="harassment">Quấy rối</option>
+                  <option value="other">Khác</option>
+                </select>
+              </label>
+
+              <label>
+                Mức độ nghiêm trọng *
+                <select
+                  name="severity"
+                  value={warningForm.severity}
+                  onChange={(e) => setWarningForm({ ...warningForm, severity: e.target.value as any })}
+                  required
+                >
+                  <option value="low">Thấp</option>
+                  <option value="medium">Trung bình</option>
+                  <option value="high">Cao</option>
+                  <option value="critical">Nghiêm trọng</option>
+                </select>
+              </label>
+
+              <label>
+                Lý do cảnh cáo *
+                <textarea
+                  name="reason"
+                  value={warningForm.reason}
+                  onChange={(e) => setWarningForm({ ...warningForm, reason: e.target.value })}
+                  placeholder="Nhập lý do cảnh cáo..."
+                  required
+                  style={{ minHeight: 80 }}
+                />
+              </label>
+
+              <label>
+                Mô tả chi tiết (tùy chọn)
+                <textarea
+                  name="description"
+                  value={warningForm.description}
+                  onChange={(e) => setWarningForm({ ...warningForm, description: e.target.value })}
+                  placeholder="Mô tả chi tiết về vi phạm..."
+                  style={{ minHeight: 100 }}
+                />
+              </label>
+
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
+                <button
+                  type="button"
+                  className="button button--ghost"
+                  onClick={() => {
+                    setShowWarnModal(null);
+                    setWarningForm({
+                      warning_type: 'content_violation',
+                      reason: '',
+                      description: '',
+                      severity: 'medium',
+                    });
+                  }}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="button button--primary"
+                  disabled={processing === showWarnModal.reportId || !warningForm.reason.trim()}
+                >
+                  {processing === showWarnModal.reportId ? 'Đang xử lý...' : 'Cảnh cáo Seller'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
