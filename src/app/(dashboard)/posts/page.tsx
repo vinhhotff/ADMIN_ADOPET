@@ -1,10 +1,11 @@
-import { Eye, Images, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Eye, Images, Pencil, Plus, Trash2, CheckCircle, XCircle, ShieldCheck } from 'lucide-react';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 
 import { fetchPosts } from '@/lib/data/posts';
 import { RowActionDialog } from '@/components/ui/RowActionDialog';
 import { TableFilters } from '@/components/ui/TableFilters';
 import { getParamValue, includesInsensitive, SearchParams, toISOStringOrNull } from '@/lib/utils/filters';
-import { createPostAction, updatePostAction, deletePostAction } from './actions';
+import { createPostAction, updatePostAction, deletePostAction, approvePostAction, rejectPostAction } from './actions';
 
 function renderPreview(content: string) {
   if (content.length <= 80) return content;
@@ -67,6 +68,7 @@ export default async function PostsPage({ searchParams }: PostsPageProps) {
             <th>Nội dung</th>
             <th>Người đăng</th>
             <th>Tương tác</th>
+            <th>Trạng thái</th>
             <th>Tạo lúc</th>
             <th>Hành động</th>
           </tr>
@@ -74,7 +76,7 @@ export default async function PostsPage({ searchParams }: PostsPageProps) {
         <tbody>
           {filteredPosts.length === 0 && (
             <tr>
-              <td colSpan={5} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-muted)' }}>
+              <td colSpan={6} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-muted)' }}>
                 Không có bài viết phù hợp
               </td>
             </tr>
@@ -104,6 +106,15 @@ export default async function PostsPage({ searchParams }: PostsPageProps) {
               <td>
                 ❤️ {post.like_count} • 💬 {post.comment_count}
               </td>
+              <td>
+                <StatusBadge status={post.status || 'approved'} />
+                {post.moderation_reason && (
+                  <small style={{ display: 'block', color: 'var(--text-muted)', marginTop: 4 }}>{post.moderation_reason}</small>
+                )}
+                {post.is_sensitive && (
+                  <small style={{ display: 'block', color: 'var(--danger)' }}>Đánh dấu nhạy cảm</small>
+                )}
+              </td>
               <td>{new Date(post.created_at).toLocaleString('vi-VN')}</td>
               <td className="table__actions">
                 <RowActionDialog icon={<Eye size={16} />} label="Xem toàn bộ nội dung">
@@ -114,6 +125,33 @@ export default async function PostsPage({ searchParams }: PostsPageProps) {
                     </a>
                   )}
                 </RowActionDialog>
+
+                {(post.status === 'pending' || post.status === 'rejected') && (
+                  <RowActionDialog icon={<CheckCircle size={16} />} label="Duyệt bài viết">
+                    <form action={approvePostAction} className="form">
+                      <input type="hidden" name="id" value={post.id} />
+                      <p>Bạn chắc chắn muốn duyệt bài viết này?</p>
+                      <button className="button button--primary" type="submit">
+                        Duyệt bài
+                      </button>
+                    </form>
+                  </RowActionDialog>
+                )}
+
+                {(post.status === 'pending' || post.status === 'approved') && (
+                  <RowActionDialog icon={<XCircle size={16} />} label="Từ chối bài viết">
+                    <form action={rejectPostAction} className="form">
+                      <input type="hidden" name="id" value={post.id} />
+                      <label>
+                        Lý do từ chối
+                        <textarea name="reason" placeholder="Nhập lý do từ chối..." required />
+                      </label>
+                      <button className="button button--danger" type="submit">
+                        Từ chối
+                      </button>
+                    </form>
+                  </RowActionDialog>
+                )}
 
                 <RowActionDialog icon={<Pencil size={16} />} label="Cập nhật bài viết">
                   <form action={updatePostAction} className="form">

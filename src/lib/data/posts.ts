@@ -9,6 +9,13 @@ export interface AdminPost {
   image_url: string | null;
   like_count: number;
   comment_count: number;
+  status: 'pending' | 'approved' | 'rejected' | 'flagged';
+  moderation_reason: string | null;
+  is_sensitive: boolean;
+  approved_by: string | null;
+  approved_at: string | null;
+  rejected_by: string | null;
+  rejected_at: string | null;
   created_at: string;
 }
 
@@ -21,7 +28,7 @@ export async function fetchPosts(limit = 50, filters?: PostFilters): Promise<Adm
   const supabase = getServiceSupabaseClient();
   let query = supabase
     .from('posts')
-    .select('id, user_id, content, image_url, like_count, comment_count, created_at')
+    .select('id, user_id, content, image_url, like_count, comment_count, status, moderation_reason, is_sensitive, approved_by, approved_at, rejected_by, rejected_at, created_at')
     .order('created_at', { ascending: false })
     .limit(limit);
 

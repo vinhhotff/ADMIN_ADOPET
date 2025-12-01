@@ -87,6 +87,33 @@ export async function updateReelAction(formData: FormData) {
   revalidatePath('/reels');
 }
 
+async function getAdminId(): Promise<string> {
+  const supabase = getServiceSupabaseClient();
+  
+  const adminEmail = process.env.ADMIN_EMAIL;
+  if (adminEmail) {
+    const { data: adminProfile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('email', adminEmail)
+      .eq('role', 'admin')
+      .single();
+    
+    if (adminProfile?.id) {
+      return adminProfile.id;
+    }
+  }
+  
+  const { data: adminProfile } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('role', 'admin')
+    .limit(1)
+    .single();
+  
+  return adminProfile?.id || '00000000-0000-0000-0000-000000000000';
+}
+
 export async function moderateReelAction(formData: FormData) {
   const supabase = getServiceSupabaseClient();
   const id = getText(formData.get('id'));
@@ -95,10 +122,26 @@ export async function moderateReelAction(formData: FormData) {
   if (!id) throw new Error('Reel ID là bắt buộc');
   if (!status || !REEL_STATUSES.has(status)) throw new Error('Trạng thái duyệt không hợp lệ');
 
+  const adminId = await getAdminId();
+  const moderationReason = getText(formData.get('moderation_reason'));
+
   const payload: Record<string, unknown> = {
     status,
-    moderation_reason: getText(formData.get('moderation_reason')),
+    moderation_reason: moderationReason || null,
   };
+
+  // Set approval/rejection audit fields
+  if (status === 'approved') {
+    payload.approved_by = adminId;
+    payload.approved_at = new Date().toISOString();
+    payload.rejected_by = null;
+    payload.rejected_at = null;
+  } else if (status === 'rejected') {
+    payload.rejected_by = adminId;
+    payload.rejected_at = new Date().toISOString();
+    payload.approved_by = null;
+    payload.approved_at = null;
+  }
 
   const isSensitive = getBoolean(formData.get('is_sensitive'));
   const isPetRelated = getBoolean(formData.get('is_pet_related'));

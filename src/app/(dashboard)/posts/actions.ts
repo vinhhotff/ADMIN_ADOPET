@@ -75,3 +75,95 @@ export async function deletePostAction(formData: FormData) {
   revalidatePath('/posts');
 }
 
+async function getAdminId(): Promise<string> {
+  const supabase = getServiceSupabaseClient();
+  
+  const adminEmail = process.env.ADMIN_EMAIL;
+  if (adminEmail) {
+    const { data: adminProfile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('email', adminEmail)
+      .eq('role', 'admin')
+      .single();
+    
+    if (adminProfile?.id) {
+      return adminProfile.id;
+    }
+  }
+  
+  const { data: adminProfile } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('role', 'admin')
+    .limit(1)
+    .single();
+  
+  return adminProfile?.id || '00000000-0000-0000-0000-000000000000';
+}
+
+export async function approvePostAction(formData: FormData) {
+  const supabase = getServiceSupabaseClient();
+  const id = getText(formData.get('id'));
+
+  if (!id) {
+    throw new Error('Post ID là bắt buộc');
+  }
+
+  const adminId = await getAdminId();
+
+  const { error } = await supabase
+    .from('posts')
+    .update({
+      status: 'approved',
+      approved_by: adminId,
+      approved_at: new Date().toISOString(),
+      rejected_by: null,
+      rejected_at: null,
+      moderation_reason: null,
+    })
+    .eq('id', id);
+
+  if (error) {
+    console.error('approvePostAction error', error);
+    throw new Error(error.message);
+  }
+
+  revalidatePath('/posts');
+}
+
+export async function rejectPostAction(formData: FormData) {
+  const supabase = getServiceSupabaseClient();
+  const id = getText(formData.get('id'));
+  const reason = getText(formData.get('reason'));
+
+  if (!id) {
+    throw new Error('Post ID là bắt buộc');
+  }
+
+  if (!reason) {
+    throw new Error('Lý do từ chối là bắt buộc');
+  }
+
+  const adminId = await getAdminId();
+
+  const { error } = await supabase
+    .from('posts')
+    .update({
+      status: 'rejected',
+      rejected_by: adminId,
+      rejected_at: new Date().toISOString(),
+      approved_by: null,
+      approved_at: null,
+      moderation_reason: reason,
+    })
+    .eq('id', id);
+
+  if (error) {
+    console.error('rejectPostAction error', error);
+    throw new Error(error.message);
+  }
+
+  revalidatePath('/posts');
+}
+

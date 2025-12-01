@@ -1,4 +1,4 @@
-import { Camera, Eye, Pencil, Plus, ShieldCheck, Trash2 } from 'lucide-react';
+import { Camera, Eye, Pencil, Plus, ShieldCheck, Trash2, CheckCircle, XCircle } from 'lucide-react';
 
 import { fetchReels } from '@/lib/data/reels';
 import { RowActionDialog } from '@/components/ui/RowActionDialog';
@@ -151,6 +151,39 @@ export default async function ReelsPage({ searchParams }: ReelsPageProps) {
               </td>
               <td>{new Date(reel.created_at).toLocaleString('vi-VN')}</td>
               <td className="table__actions">
+                {(reel.status === 'pending' || reel.status === 'rejected') && (
+                  <form action={moderateReelAction} style={{ display: 'inline' }}>
+                    <input type="hidden" name="id" value={reel.id} />
+                    <input type="hidden" name="status" value="approved" />
+                    <button
+                      type="submit"
+                      className="button button--primary"
+                      style={{ fontSize: 12, padding: '4px 8px', marginRight: 4 }}
+                      title="Duyệt reel"
+                    >
+                      <CheckCircle size={14} style={{ marginRight: 4 }} />
+                      Duyệt
+                    </button>
+                  </form>
+                )}
+
+                {(reel.status === 'pending' || reel.status === 'approved') && (
+                  <form action={moderateReelAction} style={{ display: 'inline' }}>
+                    <input type="hidden" name="id" value={reel.id} />
+                    <input type="hidden" name="status" value="rejected" />
+                    <input type="hidden" name="moderation_reason" value="Nội dung không phù hợp" />
+                    <button
+                      type="submit"
+                      className="button button--ghost"
+                      style={{ fontSize: 12, padding: '4px 8px', marginRight: 4, color: 'var(--error)' }}
+                      title="Từ chối reel"
+                    >
+                      <XCircle size={14} style={{ marginRight: 4 }} />
+                      Từ chối
+                    </button>
+                  </form>
+                )}
+
                 <RowActionDialog icon={<Eye size={16} />} label="Xem chi tiết reel">
                   <dl className="data-list">
                     <div className="data-list__item">
