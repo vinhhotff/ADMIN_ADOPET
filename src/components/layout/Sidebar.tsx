@@ -2,14 +2,16 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Coins, ShieldAlert, Users, Film, PawPrint, FileText, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, Coins, ShieldAlert, Users, Film, PawPrint, FileText, BarChart3, Percent, CheckCircle } from 'lucide-react';
 import clsx from 'clsx';
 
 const navItems = [
   { label: 'Dashboard', href: '/', icon: LayoutDashboard },
   { label: 'Analytics', href: '/analytics', icon: BarChart3 },
+  { label: 'Commissions', href: '/commissions', icon: Percent },
   { label: 'Payouts', href: '/payouts', icon: Coins },
   { label: 'Disputes', href: '/disputes', icon: ShieldAlert },
+  { label: 'Seller Verification', href: '/sellers/verification', icon: CheckCircle },
   { label: 'Users', href: '/users', icon: Users },
   { label: 'Reels', href: '/reels', icon: Film },
   { label: 'Pets', href: '/pets', icon: PawPrint },
